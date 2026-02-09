@@ -34,7 +34,7 @@ export class JokeQuestion {
      */
 
     getRedactedValue(){
-        let wordsArray = this.joke.value.split(/\s+/);
+        let wordsArray = this.joke.value.match(/\s+|\w+(?:'\w+)*|[^\w\s]/g) || [];
 
         let redactedWordsNum = 0;
         const redactedWords = [];
@@ -43,7 +43,8 @@ export class JokeQuestion {
         while (redactedWordsNum < 3) {
             const selectedWordIndex =  Math.floor(Math.random() * wordsArray.length);
 
-            if (/\w/g.test(wordsArray[selectedWordIndex]) && !storedIndexes.includes(selectedWordIndex)){
+            if (/^[\w']+$/.test(wordsArray[selectedWordIndex]) &&
+                !storedIndexes.includes(selectedWordIndex)){
 
                 redactedWords.push({"word": wordsArray[selectedWordIndex].toLowerCase(), "index": selectedWordIndex});
                 storedIndexes.push(selectedWordIndex);
@@ -56,7 +57,7 @@ export class JokeQuestion {
 
         const sortedRedactedWords = redactedWords.sort((word1, word2) => word1.index - word2.index).map((word) => word.word);
 
-        const redactedValue = wordsArray.slice(0, wordsArray.length).join(" ");
+        const redactedValue = wordsArray.join("");
 
         return [redactedValue,sortedRedactedWords];
     }
@@ -70,7 +71,7 @@ export class JokeQuestion {
         this.answerIsSubmitted = answersSubmitted.length === this.redactedWords.length;
 
         if (this.answerIsSubmitted){
-            this.userAnswer = answersSubmitted;
+            this.userAnswer = answersSubmitted.map(answer => answer.toLowerCase());
         }
 
     }
