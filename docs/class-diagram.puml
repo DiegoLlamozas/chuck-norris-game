@@ -1,0 +1,161 @@
+@startuml
+package "Jokes Bounded Context" as jokes {
+    package "Domain" as jokes_domain {
+        class Joke <<entity>> {
+            - id: string
+            - categories: string[]
+            - created_at: Date
+            - iconUrl: string
+            - updated_at: Date
+            - url: string
+            - value: string
+            + getFormattedCreatedAt(): string
+            + getFormattedUpdatedAt(): string
+        }
+
+        class JokeQuestion <<entity>> {
+            - id: string
+            - joke: Joke
+            - redactedJoke: string
+            - redactedWords: string[]
+            - numRedactedWords: number
+            - userAnswer: string[]
+            - answerIsSubmitted: boolean
+            + getRedactedValue(): [string, string[]]
+            + submitAnswer(answersSubmitted: string[]): void
+            + calcScore(): number
+        }
+
+        class JokeTest <<entity>> {
+            - id: string
+            - jokeQuestions: JokeQuestion[]
+            + testIsCompleted(): boolean
+            + calcTotalScore(): number
+            + calcPercentage(): number
+        }
+
+        JokeTest ||--o{ JokeQuestion : contains
+        JokeQuestion o-- Joke : references
+    }
+
+    package "Infrastructure" as jokes_infrastructure {
+        class ChuckNorrisApi {
+            + getRandomJoke(): Promise
+            + getCategories(): Promise
+            + getRandomJokeByCategory(category: string): Promise
+        }
+
+        class JokesApi <<api>> {
+            - #jokeTestsEndpoint: BaseEndpoint
+            + constructor()
+            + getTests(): Promise
+            + getTestById(id: string): Promise
+            + createTest(resource: Object): Promise
+            + deleteTest(id: string): Promise
+        }
+
+        class JokeAssembler <<assembler>> {
+            + {static} toEntitiesFromResponse(response: Object): Joke[]
+            + {static} toEntityFromResource(resource: Object): Joke
+        }
+
+        class JokeQuestionAssembler <<assembler>> {
+            + {static} toEntitiesFromResponse(response: Object): JokeQuestion[]
+            + {static} toEntityFromResource(resource: Object): JokeQuestion
+            + {static} toChildEntitiesFromResource(childResource: Object[]): JokeQuestion[]
+        }
+
+        class JokeTestAssembler <<assembler>> {
+            + {static} toEntitiesFromResponse(response: Object): JokeTest[]
+            + {static} toEntityFromResource(resource: Object): JokeTest
+        }
+
+        JokesApi ..|> BaseApi
+        JokesApi --> BaseEndpoint
+        JokeAssembler ..> Joke : creates
+        JokeQuestionAssembler ..> JokeQuestion : creates
+        JokeQuestionAssembler --> JokeAssembler
+        JokeTestAssembler ..> JokeTest : creates
+        JokeTestAssembler --> JokeQuestionAssembler
+    }
+
+    package "Application" as jokes_application {
+        class JokesStore <<store>> {
+            - jokeTest: JokeTest|null
+            - errors: any[]
+            - jokeTestLoaded: boolean
+            - currentJokeQuestion: JokeQuestion|null
+            - submittedAnswers: number
+            - testIsFinished: boolean
+            - totalScore: number
+            - answeredQuestions: number
+            + totalQuestions: computed
+            + fetchJokeTest(): void
+            + nextQuestion(): void
+            + getJokes(numOfJokes: number, awaitTime: number): Promise<Array>
+            + getJokeQuestionById(id: string): JokeQuestion[]
+            + answerQuestion(answer: string[], questionId: string): void
+            + craftJokeTest(numOfQuestions: number): Promise<Object>
+            + createNewJokeTest(test: Object): void
+            + resetGame(): void
+        }
+
+        JokesStore --> ChuckNorrisApi
+        JokesStore --> JokesApi
+        JokesStore --> JokeTestAssembler
+    }
+
+    package "Presentation" as jokes_presentation {
+        class HomePage <<component>> {
+            - router: Router
+            - store: JokesStore
+            - isLoading: boolean
+            + createNewTest(numOfQuestions: number): Promise<void>
+        }
+
+        class TestPage <<component>> {
+            - router: Router
+            - store: JokesStore
+            - answers: string[]
+            + getQuestion(id: string): JokeQuestion[]
+            + getAnswer(): void
+            + goToNextQuestion(): void
+            + goBack(): void
+            + finalScoreClass: computed
+            + isPerfectScore: computed
+        }
+
+        class JokesRoutes {
+            - jokesRoutes: Route[]
+        }
+
+        HomePage --> JokesStore
+        TestPage --> JokesStore
+        JokesRoutes --> HomePage
+        JokesRoutes --> TestPage
+    }
+}
+
+package "Shared Bounded Context" as shared {
+    package "Infrastructure" as shared_infrastructure {
+        class BaseApi {
+            - http: AxiosInstance
+            + constructor()
+            + get http(): AxiosInstance
+        }
+
+        class BaseEndpoint {
+            - http: AxiosInstance
+            - endpointPath: string
+            + constructor(baseApi: BaseApi, endpointPath: string)
+            + getAll(): Promise
+            + getById(id: string): Promise
+            + create(resource: Object): Promise
+            + update(id: string, resource: Object): Promise
+            + delete(id: string): Promise
+        }
+
+        BaseEndpoint --> BaseApi
+    }
+}
+@enduml
